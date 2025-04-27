@@ -9,8 +9,7 @@ from sklearn.model_selection import train_test_split
 
 # App Configuration
 st.set_page_config(
-    page_title="Password Strength Analyzer",
-    page_icon="🔐",
+    page_title="Password Strength Checker",
     layout="wide"
 )
 
@@ -73,7 +72,7 @@ class PasswordApp:
     
     def run(self):
         """Main application flow"""
-        st.title("🔐 Password Strength Analyzer")
+        st.title("Password Strength Checker")
         
         tab1, tab2, tab3 = st.tabs(["Analyzer", "Generator", "Security Tips"])
         
