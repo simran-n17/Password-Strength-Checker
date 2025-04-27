@@ -3,129 +3,104 @@ import numpy as np
 import random
 import string
 import re
+from typing import List, Dict
 
-def generate_password_dataset(n_samples=1000, seed=42):
-    """
-    Generate a dataset of passwords with features and strength labels
+class PasswordDatasetGenerator:
+    """Generates synthetic password datasets with strength labels"""
     
-    Args:
-        n_samples: Number of password samples to generate
-        seed: Random seed for reproducibility
+    def __init__(self, seed: int = 42):
+        self.seed = seed
+        np.random.seed(seed)
+        random.seed(seed)
         
-    Returns:
-        DataFrame with passwords and features
-    """
-    np.random.seed(seed)
-    random.seed(seed)
-    
-    # Lists to store data
-    passwords = []
-    strengths = []
-    
-    # Generate weak passwords (30% of dataset)
-    n_weak = int(n_samples * 0.3)
-    for _ in range(n_weak):
-        # Common weak patterns
-        weak_types = [
-            # Short numeric
-            ''.join(random.choices(string.digits, k=random.randint(4, 6))),
-            # Common words with simple modifications
-            random.choice(['password', 'welcome', 'admin', 'qwerty', 'abc123', '123456', 'football', 'baseball', 'dragon']) + 
-                random.choice(['', '1', '123', '!']),
-            # First name + digits
-            random.choice(['john', 'mary', 'david', 'susan', 'mike', 'sarah', 'james', 'linda', 'robert', 'emily']) + 
-                ''.join(random.choices(string.digits, k=random.randint(0, 2)))
-        ]
-        password = random.choice(weak_types)
-        passwords.append(password)
-        strengths.append('Weak')
-    
-    # Generate medium passwords (40% of dataset)
-    n_medium = int(n_samples * 0.4)
-    for _ in range(n_medium):
-        # Medium strength patterns
-        length = random.randint(7, 10)
+    def _generate_weak_passwords(self, n: int) -> List[str]:
+        """Generate common weak password patterns"""
+        weak_passwords = []
+        common_words = ['password', 'welcome', 'admin', 'qwerty', 'abc123']
         
-        # Mix of letters and numbers, maybe one capital
-        if random.choice([True, False]):
-            password = ''.join(random.choices(string.ascii_lowercase, k=length-2))
-            password += ''.join(random.choices(string.digits, k=2))
-            if random.choice([True, False]):
-                # Capitalize one letter
-                idx = random.randint(0, len(password)-1)
-                password = password[:idx] + password[idx].upper() + password[idx+1:]
-        else:
-            # Word + number + maybe special
-            word = random.choice(['sunset', 'mountain', 'tiger', 'eagle', 'winter', 'summer', 'office', 'computer', 'coffee', 'music'])
-            digits = ''.join(random.choices(string.digits, k=random.randint(2, 4)))
-            special = random.choice(['', '!', '@', '#']) if random.random() > 0.5 else ''
-            password = word + digits + special
-            
-        passwords.append(password)
-        strengths.append('Medium')
+        for _ in range(n):
+            pattern = random.choice([
+                # Short numeric
+                ''.join(random.choices(string.digits, k=random.randint(4, 6))),
+                # Common word with simple suffix
+                random.choice(common_words) + random.choice(['', '1', '123', '!']),
+                # Name with digits
+                random.choice(['john', 'mary', 'david']) + ''.join(random.choices(string.digits, k=2))
+            ])
+            weak_passwords.append(pattern)
+        return weak_passwords
     
-    # Generate strong passwords (30% of dataset)
-    n_strong = n_samples - n_weak - n_medium
-    for _ in range(n_strong):
-        # Strong password patterns
-        length = random.randint(10, 16)
+    def _generate_medium_passwords(self, n: int) -> List[str]:
+        """Generate medium strength passwords"""
+        medium_passwords = []
+        for _ in range(n):
+            length = random.randint(7, 10)
+            if random.random() > 0.5:
+                # Mixed characters
+                password = ''.join(random.choices(string.ascii_lowercase, k=length-2))
+                password += ''.join(random.choices(string.digits, k=2))
+                if random.random() > 0.5:
+                    password = password.capitalize()
+            else:
+                # Word with numbers
+                word = random.choice(['sunshine', 'winter', 'coffee'])
+                password = word + str(random.randint(100, 9999))
+            medium_passwords.append(password)
+        return medium_passwords
+    
+    def _generate_strong_passwords(self, n: int) -> List[str]:
+        """Generate cryptographically strong passwords"""
+        strong_passwords = []
+        special_chars = '!@#$%^&*'
         
-        # Complex pattern with uppercase, lowercase, digits, and special chars
-        lowercase_chars = random.randint(max(1, length - 9), length - 3)
-        uppercase_chars = random.randint(1, length - lowercase_chars - 2)
-        digit_chars = random.randint(1, length - lowercase_chars - uppercase_chars - 1)
-        special_chars = length - lowercase_chars - uppercase_chars - digit_chars
+        for _ in range(n):
+            length = random.randint(12, 16)
+            components = [
+                ''.join(random.choices(string.ascii_lowercase, k=4)),
+                ''.join(random.choices(string.ascii_uppercase, k=3)),
+                ''.join(random.choices(string.digits, k=3)),
+                ''.join(random.choices(special_chars, k=2))
+            ]
+            password = ''.join(components)
+            password = ''.join(random.sample(password, len(password)))  # Shuffle
+            strong_passwords.append(password)
+        return strong_passwords
+    
+    def generate_dataset(self, n_samples: int = 1000) -> pd.DataFrame:
+        """Generate complete password dataset"""
+        n_weak = int(n_samples * 0.3)
+        n_medium = int(n_samples * 0.4)
+        n_strong = n_samples - n_weak - n_medium
         
-        password = (
-            ''.join(random.choices(string.ascii_lowercase, k=lowercase_chars)) +
-            ''.join(random.choices(string.ascii_uppercase, k=uppercase_chars)) +
-            ''.join(random.choices(string.digits, k=digit_chars)) +
-            ''.join(random.choices('!@#$%^&*()-_=+', k=special_chars))
+        passwords = (
+            self._generate_weak_passwords(n_weak) +
+            self._generate_medium_passwords(n_medium) +
+            self._generate_strong_passwords(n_strong)
         )
         
-        # Shuffle the password characters
-        password_list = list(password)
-        random.shuffle(password_list)
-        password = ''.join(password_list)
+        strengths = ['Weak']*n_weak + ['Medium']*n_medium + ['Strong']*n_strong
         
-        passwords.append(password)
-        strengths.append('Strong')
+        return self._add_features(pd.DataFrame({
+            'password': passwords,
+            'strength': strengths
+        }))
     
-    # Create DataFrame
-    df = pd.DataFrame({
-        'Password': passwords,
-        'Strength': strengths
-    })
-    
-    # Add features
-    df['Length'] = df['Password'].apply(len)
-    df['Has_Lowercase'] = df['Password'].apply(lambda x: 1 if re.search(r'[a-z]', x) else 0)
-    df['Has_Uppercase'] = df['Password'].apply(lambda x: 1 if re.search(r'[A-Z]', x) else 0)
-    df['Has_Digit'] = df['Password'].apply(lambda x: 1 if re.search(r'\d', x) else 0)
-    df['Has_Special'] = df['Password'].apply(lambda x: 1 if re.search(r'[!@#$%^&*()_\-+=\[\]{}|:;,.<>?/~]', x) else 0)
-    df['Lowercase_Count'] = df['Password'].apply(lambda x: sum(c.islower() for c in x))
-    df['Uppercase_Count'] = df['Password'].apply(lambda x: sum(c.isupper() for c in x))
-    df['Digit_Count'] = df['Password'].apply(lambda x: sum(c.isdigit() for c in x))
-    df['Special_Count'] = df['Password'].apply(lambda x: sum(not c.isalnum() for c in x))
-    
-    # Shuffle the dataset
-    df = df.sample(frac=1, random_state=seed).reset_index(drop=True)
-    
-    return df
+    def _add_features(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Add password features to dataframe"""
+        df['length'] = df['password'].str.len()
+        df['has_lower'] = df['password'].str.contains(r'[a-z]').astype(int)
+        df['has_upper'] = df['password'].str.contains(r'[A-Z]').astype(int)
+        df['has_digit'] = df['password'].str.contains(r'\d').astype(int)
+        df['has_special'] = df['password'].str.contains(r'[^a-zA-Z0-9]').astype(int)
+        return df.sample(frac=1, random_state=self.seed).reset_index(drop=True)
 
-def save_password_dataset(n_samples=1000, filename="password_strength_dataset.csv"):
-    """
-    Generate and save a password dataset to CSV
-    
-    Args:
-        n_samples: Number of samples to generate
-        filename: Output CSV filename
-    """
-    df = generate_password_dataset(n_samples)
-    df.to_csv(filename, index=False)
-    print(f"Dataset with {n_samples} samples saved to {filename}")
+def save_dataset(filepath: str = "password_dataset.csv", n_samples: int = 5000):
+    """Generate and save dataset"""
+    generator = PasswordDatasetGenerator()
+    df = generator.generate_dataset(n_samples)
+    df.to_csv(filepath, index=False)
+    print(f"Dataset saved to {filepath} with {n_samples} samples")
     return df
 
 if __name__ == "__main__":
-    # Generate and save a dataset with 1000 samples
-    save_password_dataset(1000)
+    save_dataset()
